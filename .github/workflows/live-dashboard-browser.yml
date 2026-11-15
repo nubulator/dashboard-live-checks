@@ -77,7 +77,7 @@ jobs:
             await control(label + ' weather', async () => {
               const weather = page.getByRole('heading', { name: /Columbus Weather|New Albany Weather/i });
               const text = await weather.locator('..').innerText({ timeout: 6000 });
-              return /d+°/.test(text) ? 'temperature rendered' : 'temperature missing';
+              return /\d+\s*°/.test(text) ? 'temperature rendered' : 'temperature missing';
             });
             await control(label + ' NBA filter', async () => {
               await page.getByRole('button', { name: 'NBA', exact: true }).click({ timeout: 6000 });
@@ -91,12 +91,25 @@ jobs:
               return before === await slide.innerText() ? 'content did not change' : 'content advanced';
             });
             await control(label + ' Daily Line', async () => {
-              await page.getByRole('button', { name: 'DAILY LINE', exact: true }).click({ timeout: 6000 });
-              await page.getByText(/THE DAILY LINE/).first().waitFor({ timeout: 15000 });
-              const odds = page.getByText('ESPN pregame odds', { exact: true });
-              const pending = page.getByText('Awaiting published ESPN odds', { exact: true });
-              await odds.or(pending).first().waitFor({ timeout: 12000 }).catch(() => {});
-              return (await odds.count()) + ' published cards, ' + (await pending.count()) + ' awaiting odds';
+              // The sports toolbar's DAILY LINE button is hidden on some TV layouts.
+              // Use the supported direct-entry URL for Basement and Garage's shared iframe.
+              let target = page;
+              if (label === 'Garage') {
+                await page.evaluate(() => window.openGarageSharedDailyLine());
+                await page.locator('#garage-shared-daily-line-frame').waitFor({ state: 'visible', timeout: 15000 });
+                target = page.frameLocator('#garage-shared-daily-line-frame');
+              } else {
+                await page.goto(basement + 'index-v3822.html?view=daily-line', { waitUntil: 'domcontentloaded', timeout: 30000 });
+              }
+              await target.locator('#daily-line-view').waitFor({ state: 'visible', timeout: 15000 });
+              const cards = target.locator('#line-games .line-card');
+              await cards.first().waitFor({ state: 'visible', timeout: 20000 });
+              const count = await cards.count();
+              const text = await target.locator('#line-games').innerText();
+              const spreads = (text.match(/SPREAD/g) || []).length;
+              const totals = (text.match(/OVER \/ UNDER/g) || []).length;
+              const missing = (text.match(/—/g) || []).length;
+              return count + ' cards, ' + spreads + ' spread labels, ' + totals + ' total labels, ' + missing + ' unavailable values';
             });
           }
           try {
