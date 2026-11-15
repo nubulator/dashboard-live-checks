@@ -104,12 +104,17 @@ jobs:
               await target.locator('#daily-line-view').waitFor({ state: 'visible', timeout: 15000 });
               const cards = target.locator('#line-games .line-card');
               await cards.first().waitFor({ state: 'visible', timeout: 20000 });
-              const count = await cards.count();
-              const text = await target.locator('#line-games').innerText();
-              const spreads = (text.match(/SPREAD/g) || []).length;
-              const totals = (text.match(/OVER \/ UNDER/g) || []).length;
-              const missing = (text.match(/—/g) || []).length;
-              return count + ' cards, ' + spreads + ' spread labels, ' + totals + ' total labels, ' + missing + ' unavailable values';
+              // A .line-empty placeholder is not a game or published odds.
+              const games = target.locator('#line-games .line-card:not(.line-empty)');
+              await games.first().waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
+              const count = await games.count();
+              if (!count) return '0 game cards; empty-state placeholder (no odds available to verify)';
+              const sources = await games.locator('.line-source').allTextContents();
+              const published = sources.filter(t => t.includes('ESPN pregame odds')).length;
+              const awaiting = sources.filter(t => t.includes('Awaiting published ESPN odds')).length;
+              const text = await games.allInnerTexts();
+              const missing = text.join(' ').match(/—/g)?.length || 0;
+              return count + ' game cards; ' + published + ' with ESPN odds, ' + awaiting + ' awaiting odds, ' + missing + ' unavailable values';
             });
           }
           try {
