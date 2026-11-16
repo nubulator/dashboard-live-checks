@@ -44,6 +44,12 @@ jobs:
           async function open(url) {
             const page = await context.newPage();
             page.on('pageerror', error => problems.add('JavaScript: ' + error.message.split('\n')[0]));
+            // Capture diagnostic browser console failures separately from request failures.
+            page.on('console', message => {
+              if (message.type() === 'error' && /espn|cors|failed to fetch/i.test(message.text())) {
+                problems.add('Browser console: ' + message.text().slice(0, 240));
+              }
+            });
             page.on('response', response => {
               if (response.status() >= 400) problems.add(response.status() + ' ' + safeUrl(response.url()));
             });
