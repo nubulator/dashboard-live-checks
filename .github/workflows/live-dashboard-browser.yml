@@ -81,9 +81,16 @@ jobs:
               return 'headlines populated and moving';
             });
             await control(label + ' weather', async () => {
-              const weather = page.getByRole('heading', { name: /Columbus Weather|New Albany Weather/i });
-              const text = await weather.locator('..').innerText({ timeout: 6000 });
-              return /\d+\s*°/.test(text) ? 'temperature rendered' : 'temperature missing';
+              // Both dashboards fetch weather asynchronously; Garage starts after 4.8s.
+              // Do not report a missing temperature while initial loading is still in progress.
+              const weather = page.locator('#weather');
+              await weather.waitFor({ state: 'attached', timeout: 6000 });
+              await page.waitForFunction(() => {
+                const value = document.querySelector('#weather')?.textContent || '';
+                return /\d+\s*°/.test(value) || /unavailable|retrying|error/i.test(value);
+              }, null, { timeout: 12000 }).catch(() => {});
+              const value = (await weather.innerText()).trim();
+              return /\d+\s*°/.test(value) ? 'temperature rendered' : 'temperature missing (' + value.slice(0, 90) + ')';
             });
             await control(label + ' NBA filter', async () => {
               await page.getByRole('button', { name: 'NBA', exact: true }).click({ timeout: 6000 });
@@ -127,7 +134,8 @@ jobs:
             const dashboards = await Promise.allSettled([
               dashboard(basement + 'index-v3822.html', 'Basement', /Next entertainment feature/i),
               dashboard(garage, 'Garage', /^NEXT/),
-              open(basement + 'game-day.html')
+              open(basement + 'game-day.html'),
+              open(garage + 'game-day.html')
             ]);
             for (const result of dashboards) if (result.status === 'rejected') throw result.reason;
             const room = await open(basement + 'games.html');
