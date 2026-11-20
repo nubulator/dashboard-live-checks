@@ -139,7 +139,7 @@ jobs:
             ]);
             for (const result of dashboards) if (result.status === 'rejected') throw result.reason;
             const room = await open(basement + 'games.html');
-            const filenames = ['kings', 'euchre', 'trivia', 'music', 'survey', 'casino', 'last-call', 'bernie'];
+            const filenames = ['kings', 'euchre', 'trivia', 'music', 'survey', 'casino', 'last-call', 'bernie', 'house-rules', 'test-games'];
             for (const name of filenames) {
               const link = room.locator('a[href$="/' + name + '.html"], a[href="' + name + '.html"]').first();
               const href = await link.getAttribute('href', { timeout: 6000 });
